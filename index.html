@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather Forecast</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f8ff;
+      --text: #172033;
+      --muted: #4d5b78;
+      --surface: #ffffff;
+      --border: #dce5f7;
+      --accent: #2f7bff;
+      --accent-soft: #e7f0ff;
+      --card-shadow: 0 10px 30px rgba(18, 34, 74, 0.1);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1320;
+        --text: #e8eefc;
+        --muted: #a8b8dc;
+        --surface: #161e31;
+        --border: #2a3758;
+        --accent: #60a5ff;
+        --accent-soft: #1b2a45;
+        --card-shadow: 0 12px 34px rgba(0, 0, 0, 0.35);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      font: 400 15px/1.45 "Inter", "Segoe UI", Roboto, Arial, sans-serif;
+      background: radial-gradient(circle at top, color-mix(in srgb, var(--accent) 18%, var(--bg)), var(--bg) 42%);
+      color: var(--text);
+    }
+
+    .app {
+      width: min(560px, 100%);
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--card-shadow);
+      padding: 20px;
+      backdrop-filter: blur(6px);
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: 1.5rem;
+      letter-spacing: 0.2px;
+    }
+
+    .search {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    input, button {
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    button {
+      border-color: transparent;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover { filter: brightness(1.05); }
+
+    .status {
+      margin: 4px 0 14px;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+
+    .current {
+      background: var(--accent-soft);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .city {
+      margin: 0 0 6px;
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .temp {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .desc {
+      margin-top: 6px;
+      color: var(--muted);
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .day {
+      font-weight: 600;
+      font-size: 0.88rem;
+      margin-bottom: 8px;
+      color: var(--muted);
+    }
+
+    .range {
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <h1>Weather</h1>
+    <form id="searchForm" class="search">
+      <input id="cityInput" type="text" placeholder="Search city..." autocomplete="off" />
+      <button type="submit">Search</button>
+    </form>
+    <p id="status" class="status"></p>
+    <section class="current">
+      <p id="cityName" class="city">Kolkata</p>
+      <p id="currentTemp" class="temp">--°C</p>
+      <p id="currentDesc" class="desc">Loading...</p>
+    </section>
+    <section id="forecastCards" class="cards"></section>
+  </main>
+
+  <script>
+    const fallback = {
+      city: "Kolkata",
+      temperature: 31,
+      weatherCode: 1,
+      daily: [
+        { date: "2026-09-05", min: 27, max: 33, code: 2 },
+        { date: "2026-09-06", min: 26, max: 32, code: 3 },
+        { date: "2026-09-07", min: 27, max: 34, code: 1 },
+        { date: "2026-09-08", min: 26, max: 32, code: 61 },
+        { date: "2026-09-09", min: 25, max: 31, code: 80 }
+      ]
+    };
+
+    const statusEl = document.getElementById("status");
+    const cityNameEl = document.getElementById("cityName");
+    const currentTempEl = document.getElementById("currentTemp");
+    const currentDescEl = document.getElementById("currentDesc");
+    const forecastCardsEl = document.getElementById("forecastCards");
+    const searchForm = document.getElementById("searchForm");
+    const cityInput = document.getElementById("cityInput");
+
+    const weatherLabel = (code) => {
+      if (code === 0) return "Clear sky";
+      if ([1, 2].includes(code)) return "Partly cloudy";
+      if (code === 3) return "Overcast";
+      if ([45, 48].includes(code)) return "Foggy";
+      if ([51, 53, 55, 56, 57].includes(code)) return "Drizzle";
+      if ([61, 63, 65, 66, 67].includes(code)) return "Rain";
+      if ([71, 73, 75, 77].includes(code)) return "Snow";
+      if ([80, 81, 82].includes(code)) return "Showers";
+      if ([95, 96, 99].includes(code)) return "Thunderstorm";
+      return "Mixed weather";
+    };
+
+    const accentByCode = (code) => {
+      if ([0, 1].includes(code)) return "#f59e0b";
+      if ([2, 3].includes(code)) return "#3b82f6";
+      if ([45, 48].includes(code)) return "#7c8aa5";
+      if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "#0ea5e9";
+      if ([71, 73, 75, 77].includes(code)) return "#38bdf8";
+      if ([95, 96, 99].includes(code)) return "#8b5cf6";
+      return "#2f7bff";
+    };
+
+    const formatDay = (dateStr) =>
+      new Date(dateStr).toLocaleDateString(undefined, { weekday: "short" });
+
+    const renderWeather = ({ city, temperature, weatherCode, daily }) => {
+      const accent = accentByCode(weatherCode);
+      document.documentElement.style.setProperty("--accent", accent);
+      cityNameEl.textContent = city;
+      currentTempEl.textContent = `${Math.round(temperature)}°C`;
+      currentDescEl.textContent = weatherLabel(weatherCode);
+      forecastCardsEl.innerHTML = daily.map((d) => `
+        <article class="card">
+          <div class="day">${formatDay(d.date)}</div>
+          <div>${weatherLabel(d.code)}</div>
+          <div class="range">${Math.round(d.max)}° / ${Math.round(d.min)}°</div>
+        </article>
+      `).join("");
+    };
+
+    async function fetchWeather(city) {
+      const geoURL = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`;
+      const geoRes = await fetch(geoURL);
+      const geo = await geoRes.json();
+      if (!geo.results || !geo.results.length) throw new Error("City not found");
+      const place = geo.results[0];
+
+      const weatherURL = `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=5`;
+      const weatherRes = await fetch(weatherURL);
+      const weather = await weatherRes.json();
+
+      return {
+        city: place.name,
+        temperature: weather.current.temperature_2m,
+        weatherCode: weather.current.weather_code,
+        daily: weather.daily.time.map((date, i) => ({
+          date,
+          min: weather.daily.temperature_2m_min[i],
+          max: weather.daily.temperature_2m_max[i],
+          code: weather.daily.weather_code[i]
+        }))
+      };
+    }
+
+    async function loadCity(city) {
+      statusEl.textContent = `Loading ${city}...`;
+      try {
+        const data = await fetchWeather(city);
+        renderWeather(data);
+        statusEl.textContent = `Updated live weather for ${data.city}.`;
+      } catch (err) {
+        renderWeather(fallback);
+        statusEl.textContent = `Live fetch failed (${err.message}). Showing fallback weather.`;
+      }
+    }
+
+    searchForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const city = cityInput.value.trim();
+      if (!city) return;
+      loadCity(city);
+    });
+
+    loadCity("Kolkata");
+  </script>
+</body>
+</html>
